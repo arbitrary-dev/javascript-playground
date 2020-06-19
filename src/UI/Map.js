@@ -5,12 +5,13 @@ import { Vector as VectorSource, XYZ } from 'ol/source'
 import { Circle, Fill, Stroke, Style} from 'ol/style'
 import { fromLonLat } from 'ol/proj'
 
-const DEF_ZOOM = 15
+const DEF_ZOOM = 17
 
 export class Map {
 
   constructor() {
     document.getElementById("map").innerHTML = ""
+
     this.map = new ol.Map({
       target: "map",
       layers: [
@@ -25,22 +26,61 @@ export class Map {
         zoom: DEF_ZOOM
       })
     })
+
+    const element = document.createElement('DIV')
+    const closer = document.createElement('A')
+    const content = document.createElement('DIV')
+
+    element.appendChild(closer)
+    element.appendChild(content)
+    element.className = "ol-popup"
+    closer.className = "ol-popup-closer"
+
+    closer.onclick = () => {
+      this.popupOverlay.setPosition(null)
+      closer.blur()
+      return false
+    }
+
+    this.popupOverlay = new ol.Overlay({
+      element,
+      autoPan: true,
+      autoPanAnimation: {duration: 250}
+    })
+
+    this.map.addOverlay(this.popupOverlay)
   }
 
   render(coords, text) {
     const view = this.map.getView()
-    view.setCenter(fromLonLat([coords.lon, coords.lat]))
+    const pos = fromLonLat([coords.lon, coords.lat])
+
+    view.setCenter(pos)
     view.setZoom(DEF_ZOOM)
 
     if (this.markerLayer)
       this.map.removeLayer(this.markerLayer)
+
+    const popup = this.popupOverlay
+    const marker = new ol.Feature({geometry: new Point(pos)})
+
+    this.map.on(
+      'singleclick',
+      (e) => {
+        const fs = this.map.getFeaturesAtPixel(
+          this.map.getPixelFromCoordinate(e.coordinate),
+          {layerFilter: (l) => l === this.markerLayer}
+        )
+        if (fs.length == 1)
+          popup.setPosition(fs[0].getGeometry().getCoordinates())
+        else
+          popup.setPosition(null)
+      }
+    )
+
     this.markerLayer = new VectorLayer({
       source: new VectorSource({
-        features: [
-          new ol.Feature({
-            geometry: new Point(fromLonLat([coords.lon, coords.lat]))
-          })
-        ]
+        features: [marker]
       }),
       style: new Style({
         image: new Circle({
@@ -52,8 +92,10 @@ export class Map {
     })
     this.map.addLayer(this.markerLayer)
 
-    if (this.hintOverlay)
-      this.map.removeOverlay(this.hintOverlay)
-    // TODO add a popup
+    popup.getElement().querySelector("div").textContent = text
+    this.map.once(
+      'postrender',
+      () => popup.setPosition(marker.getGeometry().getCoordinates())
+    )
   }
 }
