@@ -1,6 +1,6 @@
 import { Modal } from "./UI/Modal"
 import { Map } from "./UI/Map"
-import axios from "axios"
+import * as L from "./Utils/Location"
 
 class PlaceFinder {
 
@@ -36,9 +36,7 @@ class PlaceFinder {
     }
   }
 
-  onCoordsReceived(lon, lat, popup) {
-    const coords = { lon, lat }
-    console.log(coords)
+  onCoordsReceived(coords, popup) {
     if (!this.map)
       this.map = new Map()
     this.map.render(coords, popup)
@@ -47,7 +45,7 @@ class PlaceFinder {
   async onSubmit(e) {
     e.preventDefault()
 
-    const address = encodeURIComponent(e.target.querySelector("input").value.trim())
+    const address = e.target.querySelector("input").value.trim()
 
     if (!address) {
       alert("Type address to look out first!")
@@ -56,16 +54,12 @@ class PlaceFinder {
 
     const modal = new Modal("loading-modal-content")
     modal.show()
-    const response = await axios.get(
-      `https://nominatim.openstreetmap.org/search.php?q=${address}&format=json`
-    )
+    const data = await L.getCoords(address)
     modal.hide()
 
-    const data = response.data
-    console.log(data)
     if (data.length == 1) {
-      const d = data[0]
-      this.onCoordsReceived(d.lon, d.lat, d.display_name)
+      const { lon, lat, display_name } = data[0]
+      this.onCoordsReceived({lon, lat}, display_name)
     } else if (data.length > 1) {
       // TODO handle more results
     }
