@@ -2,6 +2,8 @@ import { Modal } from "./UI/Modal"
 import { Map } from "./UI/Map"
 import * as L from "./Utils/Location"
 
+const DEF_POPUP = "You are here!"
+
 class PlaceFinder {
 
   constructor() {
@@ -12,31 +14,36 @@ class PlaceFinder {
     locateBtn.addEventListener('click', this.onLocate.bind(this))
   }
 
-  async onLocate() {
+  onLocate() {
     const modal = new Modal('loading-modal-content')
     modal.show()
-    await new Promise(r => setTimeout(r, 1000 * (1 + Math.random())))
-    let lon, lat
-    try {
-      const result = await new Promise((resolve, reject) =>
+    new Promise(r => setTimeout(r, 1000 * (1 + Math.random())))
+      .then(() => new Promise((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject)
-      )
-      lon = result.coords.longitude,
-      lat = result.coords.latitude
-    } catch (error) {
-      alert(
-        `${error.message}\n\nNo location services for you, pal!\n\n` +
-        "…but I can generate something randomly for you."
-      )
-      lon = 24.1052 + Math.random() // 260 * Math.random() - 180
-      lat = 56.9496 + Math.random() // 180 * Math.random() - 90
-    } finally {
-      this.onCoordsReceived(lon, lat, "You are here!")
-      modal.hide()
-    }
+      ))
+      .then(result =>
+        L.getAddress({
+          lon: result.coords.longitude,
+          lat: result.coords.latitude,
+        }))
+      .then(data => {
+        const { lon, lat, display_name } = data
+        this.onCoordsReceived({lon, lat}, display_name)
+      })
+      .catch(error => {
+        alert(
+          `${error.message}\n\nNo location services for you, pal!\n\n` +
+          "…but I can generate something randomly for you."
+        )
+        this.onCoordsReceived({
+          lon: 24.1052 + Math.random(), // 260 * Math.random() - 180
+          lat: 56.9496 + Math.random(), // 180 * Math.random() - 90
+        })
+      })
+      .finally(() => modal.hide())
   }
 
-  onCoordsReceived(coords, popup) {
+  onCoordsReceived(coords, popup = DEF_POPUP) {
     if (!this.map)
       this.map = new Map()
     this.map.render(coords, popup)
