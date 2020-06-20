@@ -43,9 +43,15 @@ class PlaceFinder {
       .finally(() => modal.hide())
   }
 
+  async onMapClick(coords) {
+    console.log(`Coords clicked: ${coords}`)
+    const { lon, lat, display_name } = await L.getAddress(coords)
+    this.onCoordsReceived({lon, lat}, display_name)
+  }
+
   onCoordsReceived(coords, popup = DEF_POPUP) {
     if (!this.map)
-      this.map = new Map()
+      this.map = new Map(this.onMapClick.bind(this))
     this.map.render(coords, popup)
   }
 

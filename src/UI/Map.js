@@ -3,14 +3,16 @@ import Point from 'ol/geom/Point'
 import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer'
 import { Vector as VectorSource, XYZ } from 'ol/source'
 import { Circle, Fill, Stroke, Style} from 'ol/style'
-import { fromLonLat } from 'ol/proj'
+import { fromLonLat, transform } from 'ol/proj'
 
 const DEF_ZOOM = 17
 
 export class Map {
 
-  constructor() {
+  constructor(onMapClick) {
     document.getElementById("map").innerHTML = ""
+
+    this.onMapClick = onMapClick
 
     this.map = new ol.Map({
       target: "map",
@@ -49,6 +51,24 @@ export class Map {
     })
 
     this.map.addOverlay(this.popupOverlay)
+
+    this.map.on(
+      'singleclick',
+      (e) => {
+        const fs = this.map.getFeaturesAtPixel(
+          this.map.getPixelFromCoordinate(e.coordinate),
+          {layerFilter: (l) => this.markerLayer && l === this.markerLayer}
+        )
+        if (fs.length == 1) {
+          this.popupOverlay.setPosition(fs[0].getGeometry().getCoordinates())
+        } else {
+          const [lon, lat] = transform(e.coordinate, 'EPSG:3857', 'EPSG:4326')
+          const coords = { lon, lat }
+          this.popupOverlay.setPosition(null)
+          this.onMapClick(coords)
+        }
+      }
+    )
   }
 
   render(coords, text) {
@@ -61,22 +81,7 @@ export class Map {
     if (this.markerLayer)
       this.map.removeLayer(this.markerLayer)
 
-    const popup = this.popupOverlay
     const marker = new ol.Feature({geometry: new Point(pos)})
-
-    this.map.on(
-      'singleclick',
-      (e) => {
-        const fs = this.map.getFeaturesAtPixel(
-          this.map.getPixelFromCoordinate(e.coordinate),
-          {layerFilter: (l) => l === this.markerLayer}
-        )
-        if (fs.length == 1)
-          popup.setPosition(fs[0].getGeometry().getCoordinates())
-        else
-          popup.setPosition(null)
-      }
-    )
 
     this.markerLayer = new VectorLayer({
       source: new VectorSource({
@@ -92,10 +97,10 @@ export class Map {
     })
     this.map.addLayer(this.markerLayer)
 
-    popup.getElement().querySelector("div").textContent = text
+    this.popupOverlay.getElement().querySelector("div").textContent = text
     this.map.once(
       'postrender',
-      () => popup.setPosition(marker.getGeometry().getCoordinates())
+      () => this.popupOverlay.setPosition(marker.getGeometry().getCoordinates())
     )
   }
 }
