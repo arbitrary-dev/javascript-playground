@@ -59,13 +59,14 @@ export class Map {
           this.map.getPixelFromCoordinate(e.coordinate),
           {layerFilter: (l) => this.markerLayer && l === this.markerLayer}
         )
-        if (fs.length == 1) {
+        if (fs.length == 1
+            && this.popupOverlay.getElement().querySelector("div").textContent) {
           this.popupOverlay.setPosition(fs[0].getGeometry().getCoordinates())
         } else {
           const [lon, lat] = transform(e.coordinate, 'EPSG:3857', 'EPSG:4326')
           const coords = { lon, lat }
           this.popupOverlay.setPosition(null)
-          this.onMapClick(coords)
+          this.onMapClick && this.onMapClick(coords)
         }
       }
     )
@@ -97,10 +98,12 @@ export class Map {
     })
     this.map.addLayer(this.markerLayer)
 
-    this.popupOverlay.getElement().querySelector("div").textContent = text
-    this.map.once(
-      'postrender',
-      () => this.popupOverlay.setPosition(marker.getGeometry().getCoordinates())
-    )
+    if (text) {
+      this.popupOverlay.getElement().querySelector("div").textContent = text
+      this.map.once(
+        'postrender',
+        () => this.popupOverlay.setPosition(marker.getGeometry().getCoordinates())
+      )
+    }
   }
 }

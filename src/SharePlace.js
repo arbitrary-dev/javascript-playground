@@ -7,11 +7,26 @@ const DEF_POPUP = "You are here!"
 class PlaceFinder {
 
   constructor() {
-    const addressForm = document.querySelector("#place-data form")
-    const locateBtn = document.getElementById("locate-btn")
+    document.querySelector("#place-data form")
+      .addEventListener('submit', this.onSubmit.bind(this))
 
-    addressForm.addEventListener('submit', this.onSubmit.bind(this))
-    locateBtn.addEventListener('click', this.onLocate.bind(this))
+    document.getElementById("locate-btn")
+      .addEventListener('click', this.onLocate.bind(this))
+
+    this.shareLink = document.getElementById("share-link")
+    this.shareBtn = document.getElementById("share-btn")
+
+    this.shareBtn.addEventListener('click', this.onShare.bind(this))
+  }
+
+  onShare() {
+    if (navigator.clipboard) {
+      const link = this.shareLink.value
+      navigator.clipboard.writeText(link)
+        .then(alert(`Copied to clipboard:\n\n${link}`))
+    } else {
+      this.shareLink.select()
+    }
   }
 
   onLocate() {
@@ -28,14 +43,14 @@ class PlaceFinder {
         }))
       .then(data => {
         const { lon, lat, display_name } = data
-        this.onCoordsReceived({lon, lat}, display_name)
+        this.showLocation({lon, lat}, display_name)
       })
       .catch(error => {
         alert(
           `${error.message}\n\nNo location services for you, pal!\n\n` +
           "…but I can generate something randomly for you."
         )
-        this.onCoordsReceived({
+        this.showLocation({
           lon: 24.1052 + Math.random(), // 260 * Math.random() - 180
           lat: 56.9496 + Math.random(), // 180 * Math.random() - 90
         })
@@ -46,13 +61,22 @@ class PlaceFinder {
   async onMapClick(coords) {
     console.log(`Coords clicked: ${coords}`)
     const { lon, lat, display_name } = await L.getAddress(coords)
-    this.onCoordsReceived({lon, lat}, display_name)
+    this.showLocation({lon, lat}, display_name)
   }
 
-  onCoordsReceived(coords, popup = DEF_POPUP) {
+  showLocation(coords, address) {
     if (!this.map)
       this.map = new Map(this.onMapClick.bind(this))
-    this.map.render(coords, popup)
+    this.map.render(coords, address || DEF_POPUP)
+
+    let params = { ...coords }
+    if (address)
+      params.address = encodeURIComponent(address)
+    params = Object.entries(params)
+    params = params.map(([k, v]) => `${k}=${v}`).join('&')
+
+    this.shareLink.value = `${location.origin}/my-place?${params}`
+    this.shareBtn.disabled = false
   }
 
   async onSubmit(e) {
@@ -70,11 +94,9 @@ class PlaceFinder {
     const data = await L.getCoords(address)
     modal.hide()
 
-    if (data.length == 1) {
+    if (data.length) {
       const { lon, lat, display_name } = data[0]
-      this.onCoordsReceived({lon, lat}, display_name)
-    } else if (data.length > 1) {
-      // TODO handle more results
+      this.showLocation({lon, lat}, display_name)
     }
   }
 }
